@@ -1,0 +1,17 @@
+<?php
+session_start();
+header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
+header("Cache-Control: post-check=0, pre-check=0", false);
+header("Pragma: no-cache");
+require_once __DIR__.'/../config/database.php';
+if(empty($_SESSION['logged_in'])){header("Location:../login.php");exit;}
+if(isset($_GET['verify'])){$pdo->prepare("UPDATE payments SET status='verified', verified_by=?, verified_at=NOW() WHERE payment_id=?")->execute([$_SESSION['user_id'], $_GET['verify']]); header("Location:payments.php?msg=verified"); exit;}
+if(isset($_GET['reject'])){$pdo->prepare("UPDATE payments SET status='rejected' WHERE payment_id=?")->execute([$_GET['reject']]); header("Location:payments.php?msg=rejected"); exit;}
+if(isset($_GET['delete'])){$pdo->prepare("DELETE FROM payments WHERE payment_id=?")->execute([$_GET['delete']]); header("Location:payments.php?msg=deleted"); exit;}
+$all=$pdo->query("SELECT p.*, c.full_name, c.email, c.phone FROM payments p LEFT JOIN contributors c ON p.contributor_id=c.contributor_id ORDER BY p.payment_id DESC")->fetchAll();
+?>
+<!DOCTYPE html><html><head><meta charset="utf-8"><link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"><link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet"><style>body{background:#f4f7fb}.card{border:none;border-radius:20px}</style></head><body class="p-4"><div class="container-fluid">
+<div class="d-flex justify-content-between mb-4"><h3 class="fw-bold"><i class="bi bi-cash-coin"></i> Payments</h3><div><a href="index.php" class="btn btn-outline-dark rounded-pill">Dashboard</a> <a href="export.php" class="btn btn-success rounded-pill">Export</a></div></div>
+<?php if(isset($_GET['msg'])):?><div class="alert alert-success">Payment <?=htmlspecialchars($_GET['msg'])?>!</div><?php endif;?>
+<div class="card p-4"><div class="table-responsive"><table class="table table-hover align-middle"><thead class="table-light"><tr><th>ID</th><th>Contributor</th><th>Ref</th><th>Amount</th><th>Method</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead><tbody>
+<?php foreach($all as $r):?><tr><td>#<?=$r['payment_id']?></td><td><b><?=htmlspecialchars($r['full_name']??'ID:'.$r['contributor_id'])?></b><br><small><?=$r['email']?><br><?=$r['phone']?></small></td><td><small><?=$r['payment_reference']?><br><?=$r['transaction_reference']?></small></td><td class="fw-bold text-success">UGX <?=number_format($r['amount'])?></td><td><span class="badge bg-light text-dark border"><?=$r['payment_method']?></span></td><td><span class="badge bg-<?=($r['status']=='verified'?'success':($r['status']=='pending'?'warning text-dark':'danger'))?>"><?=$r['status']?></span></td><td><small><?=$r['payment_date']?></small></td><td><a href="?verify=<?=$r['payment_id']?>" class="btn btn-sm btn-success rounded-pill">Verify</a> <a href="?reject=<?=$r['payment_id']?>" class="btn btn-sm btn-warning rounded-pill">Reject</a> <a href="?delete=<?=$r['payment_id']?>" onclick="return confirm('Delete?')" class="btn btn-sm btn-outline-danger rounded-pill"><i class="bi bi-trash"></i></a></td></tr><?php endforeach;?></tbody></table></div></div></div></body></html>

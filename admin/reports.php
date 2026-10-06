@@ -1,0 +1,15 @@
+<?php
+session_start(); require_once __DIR__ . '/../config/database.php';
+if(empty($_SESSION['logged_in'])){header("Location:../login.php");exit;}
+$by_sector=$pdo->query("SELECT s.name, SUM(p.amount) as total FROM payments p LEFT JOIN sectors s ON p.sector_id=s.sector_id WHERE p.status='verified' GROUP BY s.name")->fetchAll();
+$monthly=$pdo->query("SELECT DATE_FORMAT(payment_date, '%Y-%m') as m, SUM(amount) as total FROM payments WHERE status='verified' GROUP BY m ORDER BY m DESC LIMIT 12")->fetchAll();
+$stats=['verified'=>$pdo->query("SELECT SUM(amount) FROM payments WHERE status='verified'")->fetchColumn(),'pending'=>$pdo->query("SELECT SUM(amount) FROM payments WHERE status='pending'")->fetchColumn(),'pledged'=>$pdo->query("SELECT SUM(amount) FROM pledges WHERE status='pending'")->fetchColumn(),'contributors'=>$pdo->query("SELECT COUNT(*) FROM contributors")->fetchColumn()];
+?>
+<!DOCTYPE html><html><head><link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"><script src="https://cdn.jsdelivr.net/npm/chart.js"></script><style>body{background:#f4f7fb}.card{border:none;border-radius:16px}</style></head><body class="p-4">
+<div class="container-fluid"><div class="d-flex justify-content-between mb-3"><h4 class="fw-bold">Reports & Analytics</h4><a href="index.php" class="btn btn-dark rounded-pill">Dashboard</a> <a href="export.php" class="btn btn-success rounded-pill">Export CSV</a></div>
+<div class="row g-3 mb-3"><div class="col-md-3"><div class="card p-3 text-center"><small>VERIFIED</small><h5 class="fw-bold text-success">UGX <?=number_format($stats['verified'])?></h5></div></div><div class="col-md-3"><div class="card p-3 text-center"><small>PENDING</small><h5 class="fw-bold text-warning">UGX <?=number_format($stats['pending'])?></h5></div></div><div class="col-md-3"><div class="card p-3 text-center"><small>PLEDGES</small><h5 class="fw-bold text-info">UGX <?=number_format($stats['pledged'])?></h5></div></div><div class="col-md-3"><div class="card p-3 text-center"><small>CONTRIBUTORS</small><h5 class="fw-bold"><?=$stats['contributors']?></h5></div></div></div>
+<div class="row g-3"><div class="col-md-6"><div class="card p-4"><h6>By Sector</h6><canvas id="sectorChart"></canvas></div></div><div class="col-md-6"><div class="card p-4"><h6>Monthly Collections</h6><canvas id="monthChart"></canvas></div></div></div>
+<script>
+new Chart(document.getElementById('sectorChart'),{type:'doughnut',data:{labels:[<?php foreach($by_sector as $s) echo "'".$s['name']."',"; ?>],datasets:[{data:[<?php foreach($by_sector as $s) echo ($s['total']??0).","; ?>],backgroundColor:['#0d2a5e','#d4a017','#28a745','#dc3545','#6f42c1']}]}});
+new Chart(document.getElementById('monthChart'),{type:'bar',data:{labels:[<?php foreach(array_reverse($monthly) as $m) echo "'".$m['m']."',"; ?>],datasets:[{label:'UGX',data:[<?php foreach(array_reverse($monthly) as $m) echo $m['total'].","; ?>],backgroundColor:'#0d2a5e'}]}});
+</script></div></body></html>
